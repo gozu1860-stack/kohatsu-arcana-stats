@@ -530,6 +530,37 @@ function findPairMatches(aKey, bKey, myArc, oppArc) {
   return out;
 }
 
+function dedupeMirrorPairs(pairs) {
+  const bestByKey = new Map();
+  for (const p of pairs) {
+    const a = p.my_arcana_key;
+    const b = p.opp_arcana_key;
+    if (a === b) {
+      const key = `${a}::${b}`;
+      if (!bestByKey.has(key)) {
+        bestByKey.set(key, {
+          ...p,
+          matches: Math.floor(p.matches / 2),
+          same_arcana_mirror: true,
+        });
+      }
+      continue;
+    }
+    const key = a < b ? `${a}::${b}` : `${b}::${a}`;
+    const cur = bestByKey.get(key);
+    if (!cur) {
+      bestByKey.set(key, p);
+    } else {
+      const better =
+        p.wins > cur.wins ||
+        (p.wins === cur.wins && p.rounds_won > cur.rounds_won) ||
+        (p.wins === cur.wins && p.rounds_won === cur.rounds_won && p.my_arcana_key < cur.my_arcana_key);
+      if (better) bestByKey.set(key, p);
+    }
+  }
+  return Array.from(bestByKey.values()).sort((x, y) => (y.matches - x.matches) || (y.win_rate - x.win_rate));
+}
+
 function renderArcanaPairRows(aKey, bKey, pairs, idPrefix) {
   let rows = '';
   pairs.forEach((p, idx) => {
@@ -548,14 +579,15 @@ function renderArcanaPairRows(aKey, bKey, pairs, idPrefix) {
       </a>`;
     }).join('');
 
+    const isSameMirror = !!p.same_arcana_mirror;
     rows += `<tr class="arc-row" onclick="toggleArcClips(event, this, '${clipId}')">
       <td><strong>${esc(p.my_call)}</strong> <span class="muted">(${esc(p.my_arcana_name)})</span></td>
       <td>vs <strong>${esc(p.opp_call)}</strong> <span class="muted">(${esc(p.opp_arcana_name)})</span></td>
       <td class="num">${p.matches}</td>
-      <td class="num win">${p.wins}</td>
-      <td class="num lose">${p.losses}</td>
-      <td class="num">${rateBar(p.win_rate)}</td>
-      <td class="num">${p.rounds_won} - ${p.rounds_lost}</td>
+      <td class="num ${isSameMirror ? 'muted' : 'win'}">${isSameMirror ? '-' : p.wins}</td>
+      <td class="num ${isSameMirror ? 'muted' : 'lose'}">${isSameMirror ? '-' : p.losses}</td>
+      <td class="num">${isSameMirror ? '<span class="muted">同アルカナ</span>' : rateBar(p.win_rate)}</td>
+      <td class="num ${isSameMirror ? 'muted' : ''}">${isSameMirror ? '-' : `${p.rounds_won} - ${p.rounds_lost}`}</td>
       <td class="num"><span class="yt-btn">▶ 動画 (${clips.length})</span></td>
     </tr>
     <tr id="${clipId}" class="arc-clips"><td colspan="8">
@@ -635,15 +667,16 @@ function renderMatchupList(s) {
   oppEntries.forEach((o, idx) => {
     const id = `mu-det-${idx}`;
     const mirrorTag = o.is_mirror ? ' <span class="badge">同キャラ</span>' : '';
-    const pairCountBadge = `<span class="badge">${o.pairs.length}組</span>`;
-    const detailRows = renderArcanaPairRows(ck, o.opp_char_key, o.pairs, `list-${idx}`);
+    const displayPairs = o.is_mirror ? dedupeMirrorPairs(o.pairs) : o.pairs;
+    const pairCountBadge = `<span class="badge">${displayPairs.length}組</span>`;
+    const detailRows = renderArcanaPairRows(ck, o.opp_char_key, displayPairs, `list-${idx}`);
     rows += `<tr class="mu-row" onclick="toggleMuRow(this, '${id}')">
       <td><span class="caret">▶</span> <strong>vs ${esc(o.opp_char_name)}</strong>${mirrorTag}</td>
       <td class="num">${o.real_matches}</td>
-      <td class="num win">${o.wins}</td>
-      <td class="num lose">${o.losses}</td>
+      <td class="num ${o.is_mirror ? 'muted' : 'win'}">${o.is_mirror ? '-' : o.wins}</td>
+      <td class="num ${o.is_mirror ? 'muted' : 'lose'}">${o.is_mirror ? '-' : o.losses}</td>
       <td class="num">${o.is_mirror ? '<span class="muted">50.0%（同キャラ）</span>' : rateBar(o.win_rate)}</td>
-      <td class="num">${o.rw} - ${o.rl}</td>
+      <td class="num ${o.is_mirror ? 'muted' : ''}">${o.is_mirror ? '-' : `${o.rw} - ${o.rl}`}</td>
       <td class="num">${pairCountBadge}</td>
     </tr>
     <tr id="${id}" class="mu-detail"><td colspan="7">
@@ -736,7 +769,8 @@ function renderMatchupMatrix(s) {
     const aObj = chars.find(c => c.char_key === aKey);
     const bObj = chars.find(c => c.char_key === bKey);
     if (mu && aObj && bObj) {
-      const pRows = renderArcanaPairRows(aKey, bKey, mu.arcana_pairs, 'mat');
+      const displayPairs = mu.is_mirror ? dedupeMirrorPairs(mu.arcana_pairs) : mu.arcana_pairs;
+      const pRows = renderArcanaPairRows(aKey, bKey, displayPairs, 'mat');
       detailHtml = `<div class="matrix-detail-box">
         <div class="matrix-detail-head">
           <div><strong>${esc(aObj.char_name)} vs ${esc(bObj.char_name)}</strong>（計 ${mu.real_matches}試合 / ${mu.is_mirror ? '同キャラ戦' : `${mu.wins}勝 ${mu.losses}敗・勝率 ${mu.win_rate.toFixed(1)}%`}） <span class="muted" style="font-size:0.8rem">※行クリックで試合動画リンク</span></div>
