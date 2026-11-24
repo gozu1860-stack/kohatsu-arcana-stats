@@ -1082,6 +1082,8 @@ function renderMatchesTab() {
         <label for="hlColorSel">カラー:</label>
         <select id="hlColorSel" onchange="setHlColor(this.value)"${hlChar ? '' : ' disabled'}>${colorOpts}</select>
       </div>
+    </div>
+    <div class="hl-filter-row">
       <div class="scope-box">
         <label for="hlArcSel">使用アルカナ:</label>
         <select id="hlArcSel" onchange="setHlArcana(this.value)">${arcOpts}</select>
@@ -1096,6 +1098,8 @@ function renderMatchesTab() {
         <label for="hlOppColorSel">相手カラー:</label>
         <select id="hlOppColorSel" onchange="setHlOppColor(this.value)"${hlOpp ? '' : ' disabled'}>${oppColorOpts}</select>
       </div>
+    </div>
+    <div class="hl-filter-row">
       <div class="scope-box">
         <label for="hlOppArcSel">相手アルカナ:</label>
         <select id="hlOppArcSel" onchange="setHlOppArcana(this.value)">${oppArcOpts}</select>
